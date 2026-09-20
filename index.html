@@ -128,87 +128,85 @@
       <div 
         v-for="(sent, idx) in targetSentences" 
         :key="idx"
-        class="w-full min-w-full snap-center-item p-3 flex flex-col justify-between overflow-y-auto"
+        class="w-full min-w-full snap-center-item p-3 space-y-3 overflow-y-auto"
       >
-        <div class="space-y-2.5 my-auto">
-          <!-- 英文カード -->
-          <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-100 space-y-1.5">
-            <div class="flex justify-between items-center">
-              <span class="bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded">
-                Q{{ sent.originalIndex + 1 }}
-              </span>
-              <!-- 進捗バッジ (数値評価) -->
-              <span :class="getBadgeClass(sent.score)" class="text-[10px] font-black px-2 py-0.5 rounded">
-                {{ getBadgeText(sent.score) }}
-              </span>
-            </div>
-            <p class="text-base font-bold text-slate-800 leading-snug">{{ sent.english }}</p>
+        <!-- 英文カード -->
+        <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-100 space-y-1.5">
+          <div class="flex justify-between items-center">
+            <span class="bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded">
+              Q{{ sent.originalIndex + 1 }}
+            </span>
+            <!-- 進捗バッジ (数値評価) -->
+            <span :class="getBadgeClass(sent.score)" class="text-[10px] font-black px-2 py-0.5 rounded">
+              {{ getBadgeText(sent.score) }}
+            </span>
+          </div>
+          <p class="text-base font-bold text-slate-800 leading-snug">{{ sent.english }}</p>
+        </div>
+
+        <!-- 和訳入力欄 -->
+        <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 space-y-1">
+          <label class="text-[10px] font-bold text-slate-400">あなたの和訳</label>
+          <textarea 
+            v-model="sent.userInputText" 
+            rows="2" 
+            placeholder="ここに和訳を入力..."
+            class="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+          ></textarea>
+        </div>
+
+        <!-- 解答・解説エリア (ボタン押下後に表示) -->
+        <div v-if="isAnswerRevealed && currentSentIdx === idx" class="space-y-2.5 max-h-60 overflow-y-auto">
+          <!-- 模範解答 -->
+          <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
+            <p class="text-[10px] font-bold text-emerald-600 mb-0.5 flex items-center gap-1">✔ 模範解答</p>
+            <p class="font-bold text-xs text-slate-800 leading-relaxed">{{ sent.translation }}</p>
           </div>
 
-          <!-- 和訳入力欄 (スクロール不要になるよう行数を小さく) -->
-          <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 space-y-1">
-            <label class="text-[10px] font-bold text-slate-400">あなたの和訳</label>
-            <textarea 
-              v-model="sent.userInputText" 
-              rows="2" 
-              placeholder="ここに和訳を入力..."
-              class="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-            ></textarea>
-          </div>
-
-          <!-- 解答・解説エリア (ボタン押下後に表示) -->
-          <div v-if="isAnswerRevealed && currentSentIdx === idx" class="space-y-2.5 max-h-60 overflow-y-auto">
-            <!-- 模範解答 -->
-            <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
-              <p class="text-[10px] font-bold text-emerald-600 mb-0.5 flex items-center gap-1">✔ 模範解答</p>
-              <p class="font-bold text-xs text-slate-800 leading-relaxed">{{ sent.translation }}</p>
+          <!-- 解説タブ切り替え (単語 / 構文・文法 / 画像) -->
+          <div class="bg-white rounded-xl border border-slate-100 p-3 shadow-sm space-y-2">
+            <div class="flex border-b text-[11px] font-bold text-slate-400">
+              <button 
+                @click="activeExplainTab = 'words'"
+                :class="activeExplainTab === 'words' ? 'border-b-2 border-blue-600 text-blue-600' : ''"
+                class="pb-1.5 px-2"
+              >① 単語</button>
+              <button 
+                @click="activeExplainTab = 'grammar'"
+                :class="activeExplainTab === 'grammar' ? 'border-b-2 border-blue-600 text-blue-600' : ''"
+                class="pb-1.5 px-2"
+              >② 構文・文法</button>
+              <button 
+                v-if="sent.imageUrl"
+                @click="activeExplainTab = 'image'"
+                :class="activeExplainTab === 'image' ? 'border-b-2 border-blue-600 text-blue-600' : ''"
+                class="pb-1.5 px-2"
+              >③ 画像解説</button>
             </div>
 
-            <!-- 解説タブ切り替え (単語 / 構文・文法 / 画像) -->
-            <div class="bg-white rounded-xl border border-slate-100 p-3 shadow-sm space-y-2">
-              <div class="flex border-b text-[11px] font-bold text-slate-400">
-                <button 
-                  @click="activeExplainTab = 'words'"
-                  :class="activeExplainTab === 'words' ? 'border-b-2 border-blue-600 text-blue-600' : ''"
-                  class="pb-1.5 px-2"
-                >① 単語</button>
-                <button 
-                  @click="activeExplainTab = 'grammar'"
-                  :class="activeExplainTab === 'grammar' ? 'border-b-2 border-blue-600 text-blue-600' : ''"
-                  class="pb-1.5 px-2"
-                >② 構文・文法</button>
-                <button 
-                  v-if="sent.imageUrl"
-                  @click="activeExplainTab = 'image'"
-                  :class="activeExplainTab === 'image' ? 'border-b-2 border-blue-600 text-blue-600' : ''"
-                  class="pb-1.5 px-2"
-                >③ 画像解説</button>
+            <!-- Tab 1: 単語 -->
+            <div v-if="activeExplainTab === 'words'" class="grid grid-cols-2 gap-1.5 pt-0.5">
+              <div 
+                v-for="(w, wIdx) in getParsedWords(sent.wordsText)" 
+                :key="wIdx"
+                class="bg-slate-50 p-1.5 rounded-lg text-[11px] flex justify-between items-center border border-slate-100"
+              >
+                <span class="font-bold text-blue-600 truncate mr-1">{{ w.en }}</span>
+                <span class="text-slate-600 truncate">{{ w.ja }}</span>
               </div>
+              <div v-if="getParsedWords(sent.wordsText).length === 0" class="col-span-2 text-[10px] text-slate-400 py-1 text-center">
+                登録された単語はありません
+              </div>
+            </div>
 
-              <!-- Tab 1: 単語 -->
-              <div v-if="activeExplainTab === 'words'" class="grid grid-cols-2 gap-1.5 pt-0.5">
-                <div 
-                  v-for="(w, wIdx) in getParsedWords(sent.wordsText)" 
-                  :key="wIdx"
-                  class="bg-slate-50 p-1.5 rounded-lg text-[11px] flex justify-between items-center border border-slate-100"
-                >
-                  <span class="font-bold text-blue-600 truncate mr-1">{{ w.en }}</span>
-                  <span class="text-slate-600 truncate">{{ w.ja }}</span>
-                </div>
-                <div v-if="getParsedWords(sent.wordsText).length === 0" class="col-span-2 text-[10px] text-slate-400 py-1 text-center">
-                  登録された単語はありません
-                </div>
-              </div>
+            <!-- Tab 2: 構文・文法 -->
+            <div v-if="activeExplainTab === 'grammar'" class="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
+              {{ sent.explanation || '解説はありません。' }}
+            </div>
 
-              <!-- Tab 2: 構文・文法 -->
-              <div v-if="activeExplainTab === 'grammar'" class="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
-                {{ sent.explanation || '解説はありません。' }}
-              </div>
-
-              <!-- Tab 3: 画像解説 -->
-              <div v-if="activeExplainTab === 'image' && sent.imageUrl">
-                <img :src="sent.imageUrl" class="w-full rounded-lg border object-contain max-h-40">
-              </div>
+            <!-- Tab 3: 画像解説 -->
+            <div v-if="activeExplainTab === 'image' && sent.imageUrl">
+              <img :src="sent.imageUrl" class="w-full rounded-lg border object-contain max-h-40">
             </div>
           </div>
         </div>
@@ -510,7 +508,6 @@
 
       const selectedProblem = computed(() => problems.value.find(p => p.id === selectedProblemId.value));
 
-      // スコア基準: +2以上(Excellent), +1(Nice), 0(Fair), -1以下(Nice Try)
       const isMastered = (problem) => problem.sentences && problem.sentences.length > 0 && problem.sentences.every(s => (s.score || 0) >= 2);
       const getMasteredCount = (problem) => problem.sentences ? problem.sentences.filter(s => (s.score || 0) >= 2).length : 0;
       const getProgressPercent = (problem) => {
@@ -534,7 +531,6 @@
         return 'bg-rose-100 text-rose-700';
       };
 
-      // 復習モード: スコアが +1 以下の問題を対象
       const targetSentences = computed(() => {
         if (!activeProblem.value || !activeProblem.value.sentences) return [];
         return activeProblem.value.sentences
@@ -552,7 +548,6 @@
         });
       };
 
-      // スワイプ（横スクロール）同期
       const onContainerScroll = () => {
         if (!scrollContainer.value) return;
         const width = scrollContainer.value.clientWidth;
@@ -579,7 +574,6 @@
       };
 
       const startStudy = (problem) => {
-        // 元データをディープコピー（「リストへ」で保存せず破棄できるようにする）
         activeProblem.value = JSON.parse(JSON.stringify(problem));
         currentSentIdx.value = 0;
         isAnswerRevealed.value = false;
@@ -591,22 +585,18 @@
         currentScreen.value = 'study';
       };
 
-      // 「リストへ」ボタン（保存せず戻る）
       const confirmCancelStudy = () => {
         if (confirm('学習結果を保存せずにリストへ戻りますか？')) {
           currentScreen.value = 'list';
         }
       };
 
-      // 「完了・保存」ボタン（保存して戻る）
       const confirmSaveStudy = () => {
         if (confirm('学習結果を保存して終了しますか？')) {
-          // Firestore の該当大問の文データを更新
           db.collection('problems').doc(activeProblem.value.id).update({
             sentences: activeProblem.value.sentences
           });
 
-          // 利用ログを記録
           if (studyStartTime.value) {
             const now = new Date();
             const duration = Math.max(1, Math.round((now - studyStartTime.value) / 60000));
@@ -628,7 +618,6 @@
         }
       };
 
-      // スコア適用: ○(+1), △(0), ×(-1)
       const applyScore = (change, symbol) => {
         const origIdx = currentSentence.value.originalIndex;
         let score = (activeProblem.value.sentences[origIdx].score || 0) + change;
