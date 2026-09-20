@@ -159,7 +159,7 @@
   <div v-if="showAdminAuth" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
     <div class="bg-white rounded-2xl p-6 w-full max-w-sm space-y-4">
       <h3 class="font-bold text-lg text-slate-800">管理者ログイン</h3>
-      <input type="password" v-model="adminPassword" placeholder="パスワード (初期: 1234)" class="w-full p-3 border rounded-xl">
+      <input type="password" v-model="adminPassword" placeholder="パスワード" class="w-full p-3 border rounded-xl">
       <p v-if="authError" class="text-xs text-red-500">{{ authError }}</p>
       <div class="flex justify-between">
         <button @click="showAdminAuth = false" class="text-slate-400 font-bold">キャンセル</button>
