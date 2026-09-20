@@ -39,7 +39,7 @@
 </head>
 <body>
 
-<div id="app" class="h-screen max-h-screen flex flex-col justify-between safe-top safe-bottom overflow-hidden">
+<div id="app" class="h-[100dvh] max-h-[100dvh] flex flex-col justify-between safe-top safe-bottom overflow-hidden">
 
   <!-- 1. メイン画面 (英文リスト) -->
   <div v-if="currentScreen === 'list'" class="flex-1 flex flex-col overflow-y-auto">
@@ -94,7 +94,7 @@
   </div>
 
   <!-- 2. 学習画面 -->
-  <div v-if="currentScreen === 'study'" class="h-full flex flex-col bg-slate-50 overflow-hidden">
+  <div v-if="currentScreen === 'study'" class="h-[100dvh] max-h-[100dvh] flex flex-col bg-slate-50 overflow-hidden">
     <!-- ヘッダー (左: リストへ / 右: 完了・保存) -->
     <div class="p-3 bg-white shadow-sm flex justify-between items-center shrink-0 z-10">
       <button @click="confirmCancelStudy" class="text-blue-600 text-xs font-bold flex items-center gap-0.5">
@@ -123,15 +123,15 @@
     <div 
       ref="scrollContainer"
       @scroll="onContainerScroll"
-      class="flex-1 flex overflow-x-auto snap-x-mandatory scroll-smooth"
+      class="flex-1 flex overflow-x-auto min-h-0 snap-x-mandatory scroll-smooth"
     >
       <div 
         v-for="(sent, idx) in targetSentences" 
         :key="idx"
-        class="w-full min-w-full snap-center-item p-3 space-y-3 overflow-y-auto"
+        class="w-full min-w-full snap-center-item p-3 space-y-2.5 overflow-y-auto"
       >
         <!-- 英文カード -->
-        <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-100 space-y-1.5">
+        <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 space-y-1">
           <div class="flex justify-between items-center">
             <span class="bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded">
               Q{{ sent.originalIndex + 1 }}
@@ -141,11 +141,11 @@
               {{ getBadgeText(sent.score) }}
             </span>
           </div>
-          <p class="text-base font-bold text-slate-800 leading-snug">{{ sent.english }}</p>
+          <p class="text-sm font-bold text-slate-800 leading-snug">{{ sent.english }}</p>
         </div>
 
         <!-- 和訳入力欄 -->
-        <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 space-y-1">
+        <div class="bg-white p-2.5 rounded-2xl shadow-sm border border-slate-100 space-y-1">
           <label class="text-[10px] font-bold text-slate-400">あなたの和訳</label>
           <textarea 
             v-model="sent.userInputText" 
@@ -156,15 +156,15 @@
         </div>
 
         <!-- 解答・解説エリア (ボタン押下後に表示) -->
-        <div v-if="isAnswerRevealed && currentSentIdx === idx" class="space-y-2.5 max-h-60 overflow-y-auto">
+        <div v-if="isAnswerRevealed && currentSentIdx === idx" class="space-y-2 max-h-48 overflow-y-auto">
           <!-- 模範解答 -->
-          <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
+          <div class="bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl">
             <p class="text-[10px] font-bold text-emerald-600 mb-0.5 flex items-center gap-1">✔ 模範解答</p>
             <p class="font-bold text-xs text-slate-800 leading-relaxed">{{ sent.translation }}</p>
           </div>
 
           <!-- 解説タブ切り替え (単語 / 構文・文法 / 画像) -->
-          <div class="bg-white rounded-xl border border-slate-100 p-3 shadow-sm space-y-2">
+          <div class="bg-white rounded-xl border border-slate-100 p-2.5 shadow-sm space-y-2">
             <div class="flex border-b text-[11px] font-bold text-slate-400">
               <button 
                 @click="activeExplainTab = 'words'"
@@ -206,35 +206,35 @@
 
             <!-- Tab 3: 画像解説 -->
             <div v-if="activeExplainTab === 'image' && sent.imageUrl">
-              <img :src="sent.imageUrl" class="w-full rounded-lg border object-contain max-h-40">
+              <img :src="sent.imageUrl" class="w-full rounded-lg border object-contain max-h-36">
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 下部固定アクションエリア -->
-    <div class="p-3 bg-white border-t border-slate-100 shadow-lg shrink-0 space-y-2">
+    <!-- 下部固定アクションエリア (常に画面下部に固定配置) -->
+    <div class="p-3 bg-white border-t border-slate-100 shadow-lg shrink-0 space-y-2 z-10">
       <template v-if="!isAnswerRevealed">
         <button 
           v-if="currentSentence.hint"
           @click="showHintModal = true" 
-          class="w-full bg-amber-50 text-amber-800 py-2.5 rounded-xl font-bold border border-amber-200 text-xs flex items-center justify-center gap-1"
+          class="w-full bg-amber-50 text-amber-800 py-2 rounded-xl font-bold border border-amber-200 text-xs flex items-center justify-center gap-1"
         >
           💡 ヒントを見る
         </button>
         <button 
           @click="isAnswerRevealed = true" 
-          class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-md shadow-blue-200 text-xs"
+          class="w-full bg-blue-600 text-white py-2.5 rounded-xl font-bold shadow-md shadow-blue-200 text-xs"
         >
           ✔ 解答・解説を確認する
         </button>
       </template>
       <template v-else>
         <div class="grid grid-cols-3 gap-2">
-          <button @click="applyScore(1, '○')" class="bg-emerald-50 text-emerald-600 border-2 border-emerald-400 py-2.5 rounded-xl text-lg font-black">○</button>
-          <button @click="applyScore(0, '△')" class="bg-amber-50 text-amber-600 border-2 border-amber-400 py-2.5 rounded-xl text-lg font-black">△</button>
-          <button @click="applyScore(-1, '×')" class="bg-rose-50 text-rose-600 border-2 border-rose-400 py-2.5 rounded-xl text-lg font-black">×</button>
+          <button @click="applyScore(1, '○')" class="bg-emerald-50 text-emerald-600 border-2 border-emerald-400 py-2 rounded-xl text-lg font-black">○</button>
+          <button @click="applyScore(0, '△')" class="bg-amber-50 text-amber-600 border-2 border-amber-400 py-2 rounded-xl text-lg font-black">△</button>
+          <button @click="applyScore(-1, '×')" class="bg-rose-50 text-rose-600 border-2 border-rose-400 py-2 rounded-xl text-lg font-black">×</button>
         </div>
       </template>
     </div>
