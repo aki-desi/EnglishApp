@@ -399,12 +399,31 @@
 
       <!-- タブ3: 利用状況 -->
       <div v-if="adminTab === 'logs'" class="bg-white p-4 rounded-xl shadow-sm space-y-3">
-        <h3 class="font-bold text-sm text-slate-700">利用ログ</h3>
-        <div v-if="logs.length === 0" class="text-xs text-slate-400">ログはありません</div>
+        <div class="flex justify-between items-center border-b pb-2">
+          <h3 class="font-bold text-sm text-slate-700">利用ログ (全{{ logs.length }}件)</h3>
+          <button 
+            v-if="logs.length > 0"
+            @click="deleteAllLogs" 
+            class="text-xs bg-red-50 text-red-600 font-bold px-2.5 py-1 rounded-lg border border-red-200 hover:bg-red-100"
+          >
+            全ログ削除
+          </button>
+        </div>
+        
+        <div v-if="logs.length === 0" class="text-xs text-slate-400 py-4 text-center">ログはありません</div>
+        
         <div v-for="log in logs" :key="log.id" class="border-b pb-2 text-xs space-y-1">
-          <div class="flex justify-between text-slate-500">
+          <div class="flex justify-between items-center text-slate-500">
             <span>{{ log.date }} {{ log.timeRange }}</span>
-            <span class="font-bold text-blue-600">{{ log.duration }}分間</span>
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-blue-600">{{ log.duration }}分間</span>
+              <button 
+                @click="deleteLog(log.id)" 
+                class="text-[10px] text-red-500 bg-red-50 px-1.5 py-0.5 rounded font-bold hover:bg-red-100"
+              >
+                削除
+              </button>
+            </div>
           </div>
           <div class="font-bold text-slate-800">{{ log.problemTitle }}</div>
           <div class="text-slate-600">○: {{ log.circle }} / △: {{ log.triangle }} / ×: {{ log.cross }}</div>
@@ -748,13 +767,35 @@
         });
       };
 
+      // 利用ログ削除処理 (個別)
+      const deleteLog = (logId) => {
+        if (confirm('このログを削除しますか？')) {
+          db.collection('logs').doc(logId).delete();
+        }
+      };
+
+      // 利用ログ全削除処理
+      const deleteAllLogs = () => {
+        if (confirm('すべての利用ログを削除しますか？この操作は取り消せません。')) {
+          const batch = db.batch();
+          logs.value.forEach(log => {
+            const ref = db.collection('logs').doc(log.id);
+            batch.delete(ref);
+          });
+          batch.commit().then(() => {
+            alert('すべてのログを削除しました。');
+          });
+        }
+      };
+
       return {
         currentScreen, isOnlyWrongMode, showAdminAuth, adminPassword, authError, adminTab,
         newProblemTitle, selectedProblemId, selectedProblem, newForm, showHintModal, activeExplainTab, scrollContainer,
         problems, logs, activeProblem, currentSentIdx, isAnswerRevealed, targetSentences, currentSentence,
         isMastered, getMasteredCount, getProgressPercent, getBadgeText, getBadgeClass, getParsedWords, onContainerScroll, scrollToSentence,
         startStudy, confirmCancelStudy, confirmSaveStudy, applyScore,
-        loginAdmin, addProblem, updateProblemTitle, deleteProblem, handleImageUpload, addSentenceToProblem, deleteSentence, saveProblemSentences
+        loginAdmin, addProblem, updateProblemTitle, deleteProblem, handleImageUpload, addSentenceToProblem, deleteSentence, saveProblemSentences,
+        deleteLog, deleteAllLogs
       };
     }
   }).mount('#app');
