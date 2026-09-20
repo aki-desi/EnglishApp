@@ -27,14 +27,22 @@
     }
     .safe-top { padding-top: env(safe-area-inset-top); }
     .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+    
+    /* 横スクロール Snap 用 */
+    .snap-x-mandatory {
+      scroll-snap-type: x mandatory;
+    }
+    .snap-center-item {
+      scroll-snap-align: center;
+    }
   </style>
 </head>
 <body>
 
-<div id="app" class="min-h-screen flex flex-col justify-between safe-top safe-bottom">
+<div id="app" class="h-screen max-h-screen flex flex-col justify-between safe-top safe-bottom overflow-hidden">
 
   <!-- 1. メイン画面 (英文リスト) -->
-  <div v-if="currentScreen === 'list'" class="flex-1 flex flex-col">
+  <div v-if="currentScreen === 'list'" class="flex-1 flex flex-col overflow-y-auto">
     <div class="p-4 bg-white shadow-sm flex justify-between items-center">
       <div>
         <p class="text-xs font-bold text-blue-600">和訳トレーニング</p>
@@ -49,13 +57,13 @@
       <div class="bg-white p-3 rounded-xl shadow-sm flex justify-between items-center">
         <span class="text-sm font-semibold text-slate-700 flex items-center gap-2">
           <span :class="isOnlyWrongMode ? 'text-red-500' : 'text-blue-500'">●</span>
-          {{ isOnlyWrongMode ? '復習モード' : '通常モード' }}
+          {{ isOnlyWrongMode ? '復習モード (+1以下)' : '通常モード' }}
         </span>
         <input type="checkbox" v-model="isOnlyWrongMode" class="w-5 h-5 accent-blue-600 cursor-pointer">
       </div>
     </div>
 
-    <div class="px-4 space-y-4 flex-1 overflow-y-auto pb-6">
+    <div class="px-4 space-y-4 flex-1 pb-6">
       <div 
         v-for="problem in problems" 
         :key="problem.id"
@@ -86,145 +94,158 @@
   </div>
 
   <!-- 2. 学習画面 -->
-  <div v-if="currentScreen === 'study'" class="flex-1 flex flex-col bg-slate-50">
-    <!-- ヘッダー -->
-    <div class="p-4 bg-white shadow-sm flex justify-between items-center">
-      <button @click="exitStudy" class="text-blue-600 text-sm font-bold flex items-center gap-1">
+  <div v-if="currentScreen === 'study'" class="h-full flex flex-col bg-slate-50 overflow-hidden">
+    <!-- ヘッダー (左: リストへ / 右: 完了・保存) -->
+    <div class="p-3 bg-white shadow-sm flex justify-between items-center shrink-0 z-10">
+      <button @click="confirmCancelStudy" class="text-blue-600 text-xs font-bold flex items-center gap-0.5">
         ‹ リストへ
       </button>
-      <h2 class="text-sm font-bold text-slate-800 truncate max-w-[200px]">{{ activeProblem.title }}</h2>
-      <div class="w-12"></div>
+      <h2 class="text-xs font-bold text-slate-800 truncate max-w-[140px]">{{ activeProblem.title }}</h2>
+      <button @click="confirmSaveStudy" class="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm">
+        完了・保存
+      </button>
     </div>
 
     <!-- 問題選択タブ -->
-    <div class="flex gap-2 p-3 overflow-x-auto bg-white border-t border-slate-100 justify-center">
+    <div class="flex gap-2 px-3 py-2 overflow-x-auto bg-white border-t border-slate-100 shrink-0">
       <button 
         v-for="(sent, idx) in targetSentences" 
         :key="idx"
-        @click="selectSentence(idx)"
+        @click="scrollToSentence(idx)"
         :class="currentSentIdx === idx ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'"
-        class="px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition"
+        class="px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition"
       >
-        Q{{ sent.originalIndex + 1 }}
+        Q{{ sent.originalIndex + 1 }} {{ sent.lastResult || '' }}
       </button>
     </div>
 
-    <!-- メインコンテンツ -->
-    <div class="p-4 flex-1 overflow-y-auto space-y-4">
-      <!-- 英文カード -->
-      <div class="bg-white p-5 rounded-2xl shadow-sm space-y-3 border border-slate-100">
-        <div class="flex justify-between items-center">
-          <span class="bg-blue-600 text-white text-xs font-black px-2.5 py-1 rounded-md">
-            Q{{ currentSentence.originalIndex + 1 }}
-          </span>
-          <span v-if="currentSentence.score >= 2" class="text-xs font-black bg-green-100 text-green-700 px-2 py-0.5 rounded">
-            Excellent
-          </span>
-        </div>
-        <p class="text-lg font-bold text-slate-800 leading-relaxed">{{ currentSentence.english }}</p>
-      </div>
-
-      <!-- 和訳入力欄 -->
-      <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-2">
-        <label class="text-xs font-bold text-slate-400">あなたの和訳</label>
-        <textarea 
-          v-model="currentSentence.userInputText" 
-          rows="3" 
-          placeholder="ここに和訳を入力..."
-          class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        ></textarea>
-      </div>
-
-      <!-- 解答・解説エリア (ボタン押下後に表示) -->
-      <div v-if="isAnswerRevealed" class="space-y-4">
-        <!-- 模範解答 -->
-        <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl">
-          <p class="text-xs font-bold text-emerald-600 mb-1 flex items-center gap-1">
-            <span>✔</span> 模範解答
-          </p>
-          <p class="font-bold text-slate-800 leading-relaxed">{{ currentSentence.translation }}</p>
-        </div>
-
-        <!-- 解説タブ切り替え (単語 / 構文・文法 / 画像解説) -->
-        <div class="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm space-y-3">
-          <div class="flex border-b text-xs font-bold text-slate-400">
-            <button 
-              @click="activeExplainTab = 'words'"
-              :class="activeExplainTab === 'words' ? 'border-b-2 border-blue-600 text-blue-600' : ''"
-              class="pb-2 px-3"
-            >① 単語</button>
-            <button 
-              @click="activeExplainTab = 'grammar'"
-              :class="activeExplainTab === 'grammar' ? 'border-b-2 border-blue-600 text-blue-600' : ''"
-              class="pb-2 px-3"
-            >② 構文・文法</button>
-            <button 
-              v-if="currentSentence.imageUrl"
-              @click="activeExplainTab = 'image'"
-              :class="activeExplainTab === 'image' ? 'border-b-2 border-blue-600 text-blue-600' : ''"
-              class="pb-2 px-3"
-            >③ 画像解説</button>
-          </div>
-
-          <!-- Tab 1: 単語リスト -->
-          <div v-if="activeExplainTab === 'words'" class="grid grid-cols-2 gap-2 pt-1">
-            <div 
-              v-for="(w, idx) in parsedWords" 
-              :key="idx"
-              class="bg-slate-50 p-2.5 rounded-xl text-xs flex justify-between items-center border border-slate-100"
-            >
-              <span class="font-bold text-blue-600">{{ w.en }}</span>
-              <span class="text-slate-600 font-medium">{{ w.ja }}</span>
+    <!-- 横スクロール可能エリア (スワイプ移動) -->
+    <div 
+      ref="scrollContainer"
+      @scroll="onContainerScroll"
+      class="flex-1 flex overflow-x-auto snap-x-mandatory scroll-smooth"
+    >
+      <div 
+        v-for="(sent, idx) in targetSentences" 
+        :key="idx"
+        class="w-full min-w-full snap-center-item p-3 flex flex-col justify-between overflow-y-auto"
+      >
+        <div class="space-y-2.5 my-auto">
+          <!-- 英文カード -->
+          <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-100 space-y-1.5">
+            <div class="flex justify-between items-center">
+              <span class="bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded">
+                Q{{ sent.originalIndex + 1 }}
+              </span>
+              <!-- 進捗バッジ (数値評価) -->
+              <span :class="getBadgeClass(sent.score)" class="text-[10px] font-black px-2 py-0.5 rounded">
+                {{ getBadgeText(sent.score) }}
+              </span>
             </div>
-            <div v-if="parsedWords.length === 0" class="col-span-2 text-xs text-slate-400 py-2 text-center">
-              登録された単語はありません
+            <p class="text-base font-bold text-slate-800 leading-snug">{{ sent.english }}</p>
+          </div>
+
+          <!-- 和訳入力欄 (スクロール不要になるよう行数を小さく) -->
+          <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 space-y-1">
+            <label class="text-[10px] font-bold text-slate-400">あなたの和訳</label>
+            <textarea 
+              v-model="sent.userInputText" 
+              rows="2" 
+              placeholder="ここに和訳を入力..."
+              class="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+            ></textarea>
+          </div>
+
+          <!-- 解答・解説エリア (ボタン押下後に表示) -->
+          <div v-if="isAnswerRevealed && currentSentIdx === idx" class="space-y-2.5 max-h-60 overflow-y-auto">
+            <!-- 模範解答 -->
+            <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-xl">
+              <p class="text-[10px] font-bold text-emerald-600 mb-0.5 flex items-center gap-1">✔ 模範解答</p>
+              <p class="font-bold text-xs text-slate-800 leading-relaxed">{{ sent.translation }}</p>
             </div>
-          </div>
 
-          <!-- Tab 2: 構文・文法 -->
-          <div v-if="activeExplainTab === 'grammar'" class="text-xs text-slate-700 leading-relaxed pt-1 whitespace-pre-wrap">
-            {{ currentSentence.explanation || '解説はありません。' }}
-          </div>
+            <!-- 解説タブ切り替え (単語 / 構文・文法 / 画像) -->
+            <div class="bg-white rounded-xl border border-slate-100 p-3 shadow-sm space-y-2">
+              <div class="flex border-b text-[11px] font-bold text-slate-400">
+                <button 
+                  @click="activeExplainTab = 'words'"
+                  :class="activeExplainTab === 'words' ? 'border-b-2 border-blue-600 text-blue-600' : ''"
+                  class="pb-1.5 px-2"
+                >① 単語</button>
+                <button 
+                  @click="activeExplainTab = 'grammar'"
+                  :class="activeExplainTab === 'grammar' ? 'border-b-2 border-blue-600 text-blue-600' : ''"
+                  class="pb-1.5 px-2"
+                >② 構文・文法</button>
+                <button 
+                  v-if="sent.imageUrl"
+                  @click="activeExplainTab = 'image'"
+                  :class="activeExplainTab === 'image' ? 'border-b-2 border-blue-600 text-blue-600' : ''"
+                  class="pb-1.5 px-2"
+                >③ 画像解説</button>
+              </div>
 
-          <!-- Tab 3: 画像解説 -->
-          <div v-if="activeExplainTab === 'image' && currentSentence.imageUrl" class="pt-1">
-            <img :src="currentSentence.imageUrl" class="w-full rounded-xl border object-contain max-h-80">
+              <!-- Tab 1: 単語 -->
+              <div v-if="activeExplainTab === 'words'" class="grid grid-cols-2 gap-1.5 pt-0.5">
+                <div 
+                  v-for="(w, wIdx) in getParsedWords(sent.wordsText)" 
+                  :key="wIdx"
+                  class="bg-slate-50 p-1.5 rounded-lg text-[11px] flex justify-between items-center border border-slate-100"
+                >
+                  <span class="font-bold text-blue-600 truncate mr-1">{{ w.en }}</span>
+                  <span class="text-slate-600 truncate">{{ w.ja }}</span>
+                </div>
+                <div v-if="getParsedWords(sent.wordsText).length === 0" class="col-span-2 text-[10px] text-slate-400 py-1 text-center">
+                  登録された単語はありません
+                </div>
+              </div>
+
+              <!-- Tab 2: 構文・文法 -->
+              <div v-if="activeExplainTab === 'grammar'" class="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
+                {{ sent.explanation || '解説はありません。' }}
+              </div>
+
+              <!-- Tab 3: 画像解説 -->
+              <div v-if="activeExplainTab === 'image' && sent.imageUrl">
+                <img :src="sent.imageUrl" class="w-full rounded-lg border object-contain max-h-40">
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 下部アクション領域 -->
-    <div class="p-4 bg-white border-t border-slate-100 shadow-lg space-y-2">
+    <!-- 下部固定アクションエリア -->
+    <div class="p-3 bg-white border-t border-slate-100 shadow-lg shrink-0 space-y-2">
       <template v-if="!isAnswerRevealed">
         <button 
           v-if="currentSentence.hint"
           @click="showHintModal = true" 
-          class="w-full bg-amber-50 text-amber-800 py-3 rounded-xl font-bold border border-amber-200 text-sm flex items-center justify-center gap-1"
+          class="w-full bg-amber-50 text-amber-800 py-2.5 rounded-xl font-bold border border-amber-200 text-xs flex items-center justify-center gap-1"
         >
           💡 ヒントを見る
         </button>
         <button 
           @click="isAnswerRevealed = true" 
-          class="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold shadow-md shadow-blue-200 text-sm"
+          class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-md shadow-blue-200 text-xs"
         >
           ✔ 解答・解説を確認する
         </button>
       </template>
       <template v-else>
-        <div class="grid grid-cols-3 gap-3">
-          <button @click="applyScore(1, '○')" class="bg-emerald-50 text-emerald-600 border-2 border-emerald-400 py-3 rounded-2xl text-xl font-black">○</button>
-          <button @click="applyScore(0, '△')" class="bg-amber-50 text-amber-600 border-2 border-amber-400 py-3 rounded-2xl text-xl font-black">△</button>
-          <button @click="applyScore(-1, '×')" class="bg-rose-50 text-rose-600 border-2 border-rose-400 py-3 rounded-2xl text-xl font-black">×</button>
+        <div class="grid grid-cols-3 gap-2">
+          <button @click="applyScore(1, '○')" class="bg-emerald-50 text-emerald-600 border-2 border-emerald-400 py-2.5 rounded-xl text-lg font-black">○</button>
+          <button @click="applyScore(0, '△')" class="bg-amber-50 text-amber-600 border-2 border-amber-400 py-2.5 rounded-xl text-lg font-black">△</button>
+          <button @click="applyScore(-1, '×')" class="bg-rose-50 text-rose-600 border-2 border-rose-400 py-2.5 rounded-xl text-lg font-black">×</button>
         </div>
       </template>
     </div>
 
     <!-- ヒントモーダル -->
     <div v-if="showHintModal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div class="bg-white rounded-2xl p-6 w-full max-w-sm space-y-4">
-        <h3 class="font-bold text-amber-800 flex items-center gap-1">💡 ヒント</h3>
-        <p class="text-sm text-slate-700 leading-relaxed">{{ currentSentence.hint }}</p>
+      <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3">
+        <h3 class="font-bold text-amber-800 flex items-center gap-1 text-sm">💡 ヒント</h3>
+        <p class="text-xs text-slate-700 leading-relaxed">{{ currentSentence.hint }}</p>
         <button @click="showHintModal = false" class="w-full bg-slate-100 text-slate-700 font-bold py-2 rounded-xl text-xs">
           閉じる
         </button>
@@ -246,24 +267,24 @@
   </div>
 
   <!-- 4. 管理者画面 (タブ構成) -->
-  <div v-if="currentScreen === 'admin'" class="flex-1 flex flex-col bg-slate-100 z-40">
-    <div class="p-4 bg-white shadow-sm flex justify-between items-center">
+  <div v-if="currentScreen === 'admin'" class="flex-1 flex flex-col bg-slate-100 z-40 overflow-hidden">
+    <div class="p-4 bg-white shadow-sm flex justify-between items-center shrink-0">
       <h2 class="font-bold text-slate-800">管理者画面</h2>
       <button @click="currentScreen = 'list'" class="text-blue-600 text-sm font-bold">閉じる</button>
     </div>
 
     <!-- タブヘッダー -->
-    <div class="flex bg-white border-b text-sm font-bold text-slate-500">
+    <div class="flex bg-white border-b text-sm font-bold text-slate-500 shrink-0">
       <button 
         @click="adminTab = 'addProblem'" 
         :class="adminTab === 'addProblem' ? 'border-b-2 border-blue-600 text-blue-600' : ''" 
         class="flex-1 py-3 text-center"
-      >大問管理</button>
+      >大問追加</button>
       <button 
         @click="adminTab = 'addSentence'" 
         :class="adminTab === 'addSentence' ? 'border-b-2 border-blue-600 text-blue-600' : ''" 
         class="flex-1 py-3 text-center"
-      >問題追加・編集</button>
+      >問題追加</button>
       <button 
         @click="adminTab = 'logs'" 
         :class="adminTab === 'logs' ? 'border-b-2 border-blue-600 text-blue-600' : ''" 
@@ -273,7 +294,7 @@
 
     <div class="p-4 space-y-4 overflow-y-auto flex-1">
       
-      <!-- タブ1: 大問管理 -->
+      <!-- タブ1: 大問追加 -->
       <div v-if="adminTab === 'addProblem'" class="space-y-4">
         <div class="bg-white p-4 rounded-xl shadow-sm space-y-3">
           <h3 class="font-bold text-sm text-slate-700">新しい大問の追加</h3>
@@ -295,16 +316,15 @@
         </div>
       </div>
 
-      <!-- タブ2: 問題追加・編集 (案C) -->
+      <!-- タブ2: 問題追加 -->
       <div v-if="adminTab === 'addSentence'" class="space-y-4">
         <div class="bg-white p-4 rounded-xl shadow-sm space-y-3">
-          <label class="block text-xs font-bold text-slate-600">編集する大問を選択</label>
+          <label class="block text-xs font-bold text-slate-600">対象の大問を選択</label>
           <select v-model="selectedProblemId" class="w-full p-2 border rounded-lg text-sm bg-white">
             <option v-for="p in problems" :key="p.id" :value="p.id">{{ p.title }}</option>
           </select>
         </div>
 
-        <!-- 選択中の大問の問題追加/編集フォーム -->
         <div v-if="selectedProblem" class="space-y-4">
           <!-- 新規追加フォーム -->
           <div class="bg-white p-4 rounded-xl shadow-sm space-y-3 border-2 border-blue-100">
@@ -330,16 +350,16 @@
               <textarea v-model="newForm.explanation" rows="2" class="w-full p-2 border rounded-lg text-sm"></textarea>
             </div>
             <div>
-              <label class="text-xs text-slate-500 font-bold">解説画像 (iPhoneのライブラリ等から指定)</label>
+              <label class="text-xs text-slate-500 font-bold">解説画像</label>
               <input type="file" accept="image/*" @change="handleImageUpload($event, newForm)" class="w-full text-xs text-slate-500">
               <img v-if="newForm.imageUrl" :src="newForm.imageUrl" class="h-20 mt-2 rounded border object-contain">
             </div>
-            <button @click="addSentenceToProblem" class="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-bold">この大問に問題を追加</button>
+            <button @click="addSentenceToProblem" class="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-bold">問題を追加する</button>
           </div>
 
           <!-- 登録済み問題の編集リスト -->
           <div class="bg-white p-4 rounded-xl shadow-sm space-y-4">
-            <h3 class="font-bold text-sm text-slate-700">既存問題の編集 (全{{ selectedProblem.sentences.length }}問)</h3>
+            <h3 class="font-bold text-sm text-slate-700">登録済み問題の編集 (全{{ selectedProblem.sentences ? selectedProblem.sentences.length : 0 }}問)</h3>
             <div v-for="(sent, idx) in selectedProblem.sentences" :key="idx" class="p-3 border rounded-xl space-y-3 bg-slate-50">
               <div class="flex justify-between items-center">
                 <span class="font-black text-xs text-blue-600">Q{{ idx + 1 }}</span>
@@ -373,7 +393,7 @@
             </div>
 
             <button @click="saveProblemSentences" class="w-full bg-emerald-600 text-white py-3 rounded-xl text-sm font-bold shadow-md">
-              問題の変更内容をすべて保存
+              問題の変更内容を保存する
             </button>
           </div>
         </div>
@@ -427,6 +447,7 @@
       
       const showHintModal = ref(false);
       const activeExplainTab = ref('words');
+      const scrollContainer = ref(null);
 
       const newForm = ref({
         english: '',
@@ -489,38 +510,77 @@
 
       const selectedProblem = computed(() => problems.value.find(p => p.id === selectedProblemId.value));
 
-      const isMastered = (problem) => problem.sentences && problem.sentences.length > 0 && problem.sentences.every(s => s.score >= 2);
-      const getMasteredCount = (problem) => problem.sentences ? problem.sentences.filter(s => s.score >= 2).length : 0;
+      // スコア基準: +2以上(Excellent), +1(Nice), 0(Fair), -1以下(Nice Try)
+      const isMastered = (problem) => problem.sentences && problem.sentences.length > 0 && problem.sentences.every(s => (s.score || 0) >= 2);
+      const getMasteredCount = (problem) => problem.sentences ? problem.sentences.filter(s => (s.score || 0) >= 2).length : 0;
       const getProgressPercent = (problem) => {
         if (!problem.sentences || !problem.sentences.length) return 0;
         return (getMasteredCount(problem) / problem.sentences.length) * 100;
       };
 
+      const getBadgeText = (score) => {
+        const s = score || 0;
+        if (s >= 2) return 'Excellent';
+        if (s === 1) return 'Nice';
+        if (s === 0) return 'Fair';
+        return 'Nice Try';
+      };
+
+      const getBadgeClass = (score) => {
+        const s = score || 0;
+        if (s >= 2) return 'bg-emerald-100 text-emerald-700';
+        if (s === 1) return 'bg-blue-100 text-blue-700';
+        if (s === 0) return 'bg-amber-100 text-amber-700';
+        return 'bg-rose-100 text-rose-700';
+      };
+
+      // 復習モード: スコアが +1 以下の問題を対象
       const targetSentences = computed(() => {
         if (!activeProblem.value || !activeProblem.value.sentences) return [];
         return activeProblem.value.sentences
           .map((s, idx) => ({ ...s, originalIndex: idx }))
-          .filter(s => isOnlyWrongMode.value ? s.score <= 1 : true);
+          .filter(s => isOnlyWrongMode.value ? (s.score || 0) <= 1 : true);
       });
 
       const currentSentence = computed(() => targetSentences.value[currentSentIdx.value] || {});
 
-      const parsedWords = computed(() => {
-        if (!currentSentence.value.wordsText) return [];
-        return currentSentence.value.wordsText.split('\n').filter(line => line.includes(':')).map(line => {
+      const getParsedWords = (wordsText) => {
+        if (!wordsText) return [];
+        return wordsText.split('\n').filter(line => line.includes(':')).map(line => {
           const parts = line.split(':');
           return { en: parts[0].trim(), ja: parts.slice(1).join(':').trim() };
         });
-      });
+      };
 
-      const selectSentence = (idx) => {
+      // スワイプ（横スクロール）同期
+      const onContainerScroll = () => {
+        if (!scrollContainer.value) return;
+        const width = scrollContainer.value.clientWidth;
+        if (width > 0) {
+          const newIdx = Math.round(scrollContainer.value.scrollLeft / width);
+          if (newIdx !== currentSentIdx.value && newIdx >= 0 && newIdx < targetSentences.value.length) {
+            currentSentIdx.value = newIdx;
+            isAnswerRevealed.value = false;
+            activeExplainTab.value = 'words';
+          }
+        }
+      };
+
+      const scrollToSentence = (idx) => {
         currentSentIdx.value = idx;
         isAnswerRevealed.value = false;
         activeExplainTab.value = 'words';
+        if (scrollContainer.value) {
+          scrollContainer.value.scrollTo({
+            left: scrollContainer.value.clientWidth * idx,
+            behavior: 'smooth'
+          });
+        }
       };
 
       const startStudy = (problem) => {
-        activeProblem.value = problem;
+        // 元データをディープコピー（「リストへ」で保存せず破棄できるようにする）
+        activeProblem.value = JSON.parse(JSON.stringify(problem));
         currentSentIdx.value = 0;
         isAnswerRevealed.value = false;
         activeExplainTab.value = 'words';
@@ -531,37 +591,50 @@
         currentScreen.value = 'study';
       };
 
-      const exitStudy = () => {
-        if (studyStartTime.value && activeProblem.value) {
-          const now = new Date();
-          const duration = Math.max(1, Math.round((now - studyStartTime.value) / 60000));
-          const timeRange = `${studyStartTime.value.getHours()}:${String(studyStartTime.value.getMinutes()).padStart(2, '0')}〜${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
-          
-          db.collection('logs').add({
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            date: `${now.getMonth() + 1}月${now.getDate()}日`,
-            timeRange: timeRange,
-            duration: duration,
-            problemTitle: activeProblem.value.title,
-            circle: sessionCircle.value,
-            triangle: sessionTriangle.value,
-            cross: sessionCross.value
-          });
+      // 「リストへ」ボタン（保存せず戻る）
+      const confirmCancelStudy = () => {
+        if (confirm('学習結果を保存せずにリストへ戻りますか？')) {
+          currentScreen.value = 'list';
         }
-        currentScreen.value = 'list';
       };
 
+      // 「完了・保存」ボタン（保存して戻る）
+      const confirmSaveStudy = () => {
+        if (confirm('学習結果を保存して終了しますか？')) {
+          // Firestore の該当大問の文データを更新
+          db.collection('problems').doc(activeProblem.value.id).update({
+            sentences: activeProblem.value.sentences
+          });
+
+          // 利用ログを記録
+          if (studyStartTime.value) {
+            const now = new Date();
+            const duration = Math.max(1, Math.round((now - studyStartTime.value) / 60000));
+            const timeRange = `${studyStartTime.value.getHours()}:${String(studyStartTime.value.getMinutes()).padStart(2, '0')}〜${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+            
+            db.collection('logs').add({
+              timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+              date: `${now.getMonth() + 1}月${now.getDate()}日`,
+              timeRange: timeRange,
+              duration: duration,
+              problemTitle: activeProblem.value.title,
+              circle: sessionCircle.value,
+              triangle: sessionTriangle.value,
+              cross: sessionCross.value
+            });
+          }
+
+          currentScreen.value = 'list';
+        }
+      };
+
+      // スコア適用: ○(+1), △(0), ×(-1)
       const applyScore = (change, symbol) => {
         const origIdx = currentSentence.value.originalIndex;
         let score = (activeProblem.value.sentences[origIdx].score || 0) + change;
-        score = Math.min(2, Math.max(-1, score));
 
         activeProblem.value.sentences[origIdx].score = score;
         activeProblem.value.sentences[origIdx].lastResult = symbol;
-
-        db.collection('problems').doc(activeProblem.value.id).update({
-          sentences: activeProblem.value.sentences
-        });
 
         if (symbol === '○') sessionCircle.value++;
         if (symbol === '△') sessionTriangle.value++;
@@ -569,8 +642,9 @@
 
         isAnswerRevealed.value = false;
         activeExplainTab.value = 'words';
+
         if (currentSentIdx.value < targetSentences.value.length - 1) {
-          currentSentIdx.value++;
+          scrollToSentence(currentSentIdx.value + 1);
         }
       };
 
@@ -589,19 +663,25 @@
         db.collection('problems').add({
           title: newProblemTitle.value,
           sentences: []
+        }).then(() => {
+          alert('大問を追加しました！');
+          newProblemTitle.value = '';
         });
-        newProblemTitle.value = '';
       };
 
       const updateProblemTitle = (prob) => {
         db.collection('problems').doc(prob.id).update({
           title: prob.title
+        }).then(() => {
+          alert('大問タイトルを編集しました！');
         });
       };
 
       const deleteProblem = (id) => {
         if (confirm('この大問を削除しますか？')) {
-          db.collection('problems').doc(id).delete();
+          db.collection('problems').doc(id).delete().then(() => {
+            alert('大問を削除しました！');
+          });
         }
       };
 
@@ -616,7 +696,7 @@
             const canvas = document.createElement('canvas');
             let width = img.width;
             let height = img.height;
-            const maxDimension = 800; // 自動リサイズ
+            const maxDimension = 800;
 
             if (width > height) {
               if (width > maxDimension) {
@@ -635,7 +715,7 @@
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
 
-            targetObj.imageUrl = canvas.toDataURL('image/jpeg', 0.6); // 圧縮
+            targetObj.imageUrl = canvas.toDataURL('image/jpeg', 0.6);
           };
           img.src = evt.target.result;
         };
@@ -657,30 +737,34 @@
           userInputText: ''
         });
 
-        db.collection('problems').doc(selectedProblem.value.id).update({ sentences });
-
-        newForm.value = { english: '', translation: '', hint: '', wordsText: '', explanation: '', imageUrl: '' };
+        db.collection('problems').doc(selectedProblem.value.id).update({ sentences }).then(() => {
+          alert('問題を追加しました！');
+          newForm.value = { english: '', translation: '', hint: '', wordsText: '', explanation: '', imageUrl: '' };
+        });
       };
 
       const deleteSentence = (index) => {
         if (confirm('この問題を削除しますか？')) {
           selectedProblem.value.sentences.splice(index, 1);
-          saveProblemSentences();
+          saveProblemSentences('問題を削除しました！');
         }
       };
 
-      const saveProblemSentences = () => {
+      const saveProblemSentences = (msg = '問題を編集・保存しました！') => {
         if (!selectedProblem.value) return;
         db.collection('problems').doc(selectedProblem.value.id).update({
           sentences: selectedProblem.value.sentences
+        }).then(() => {
+          alert(msg);
         });
       };
 
       return {
         currentScreen, isOnlyWrongMode, showAdminAuth, adminPassword, authError, adminTab,
-        newProblemTitle, selectedProblemId, selectedProblem, newForm, showHintModal, activeExplainTab,
-        problems, logs, activeProblem, currentSentIdx, isAnswerRevealed, targetSentences, currentSentence, parsedWords,
-        isMastered, getMasteredCount, getProgressPercent, selectSentence, startStudy, exitStudy, applyScore,
+        newProblemTitle, selectedProblemId, selectedProblem, newForm, showHintModal, activeExplainTab, scrollContainer,
+        problems, logs, activeProblem, currentSentIdx, isAnswerRevealed, targetSentences, currentSentence,
+        isMastered, getMasteredCount, getProgressPercent, getBadgeText, getBadgeClass, getParsedWords, onContainerScroll, scrollToSentence,
+        startStudy, confirmCancelStudy, confirmSaveStudy, applyScore,
         loginAdmin, addProblem, updateProblemTitle, deleteProblem, handleImageUpload, addSentenceToProblem, deleteSentence, saveProblemSentences
       };
     }
