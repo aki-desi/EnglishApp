@@ -204,9 +204,14 @@
               {{ sent.explanation || '解説はありません。' }}
             </div>
 
-            <!-- Tab 3: 画像解説 -->
+            <!-- Tab 3: 画像解説 (タップで拡大) -->
             <div v-if="activeExplainTab === 'image' && sent.imageUrl">
-              <img :src="sent.imageUrl" class="w-full rounded-lg border object-contain max-h-36">
+              <img 
+                :src="sent.imageUrl" 
+                @click="openImageModal(sent.imageUrl)"
+                class="w-full rounded-lg border object-contain max-h-36 cursor-pointer hover:opacity-90 transition"
+              >
+              <p class="text-[9px] text-slate-400 text-center mt-1">🔍 タップで拡大表示</p>
             </div>
           </div>
         </div>
@@ -350,7 +355,12 @@
             <div>
               <label class="text-xs text-slate-500 font-bold">解説画像</label>
               <input type="file" accept="image/*" @change="handleImageUpload($event, newForm)" class="w-full text-xs text-slate-500">
-              <img v-if="newForm.imageUrl" :src="newForm.imageUrl" class="h-20 mt-2 rounded border object-contain">
+              <img 
+                v-if="newForm.imageUrl" 
+                :src="newForm.imageUrl" 
+                @click="openImageModal(newForm.imageUrl)"
+                class="h-20 mt-2 rounded border object-contain cursor-pointer"
+              >
             </div>
             <button @click="addSentenceToProblem" class="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-bold">問題を追加する</button>
           </div>
@@ -386,7 +396,12 @@
               <div>
                 <label class="text-[10px] text-slate-400 font-bold">解説画像</label>
                 <input type="file" accept="image/*" @change="handleImageUpload($event, sent)" class="w-full text-xs text-slate-500">
-                <img v-if="sent.imageUrl" :src="sent.imageUrl" class="h-20 mt-1 rounded border object-contain">
+                <img 
+                  v-if="sent.imageUrl" 
+                  :src="sent.imageUrl" 
+                  @click="openImageModal(sent.imageUrl)"
+                  class="h-20 mt-1 rounded border object-contain cursor-pointer"
+                >
               </div>
             </div>
 
@@ -465,6 +480,24 @@
     </div>
   </div>
 
+  <!-- 5. 画像拡大モーダル -->
+  <div 
+    v-if="modalImageUrl" 
+    @click="closeImageModal"
+    class="fixed inset-0 bg-black/90 flex items-center justify-center p-2 z-50 cursor-pointer"
+  >
+    <button 
+      @click="closeImageModal" 
+      class="absolute top-4 right-4 bg-white/20 text-white rounded-full w-10 h-10 text-xl font-bold flex items-center justify-center backdrop-blur-sm"
+    >
+      ✕
+    </button>
+    <img 
+      :src="modalImageUrl" 
+      class="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+    >
+  </div>
+
 </div>
 
 <script>
@@ -497,6 +530,7 @@
       const showHintModal = ref(false);
       const activeExplainTab = ref('words');
       const scrollContainer = ref(null);
+      const modalImageUrl = ref(null); // 画像拡大表示用
 
       const newForm = ref({
         english: '',
@@ -639,6 +673,14 @@
         }
       };
 
+      const openImageModal = (url) => {
+        modalImageUrl.value = url;
+      };
+
+      const closeImageModal = () => {
+        modalImageUrl.value = null;
+      };
+
       const startStudy = (problem) => {
         activeProblem.value = JSON.parse(JSON.stringify(problem));
         currentSentIdx.value = 0;
@@ -740,14 +782,12 @@
         }
       };
 
-      // 利用ログ削除 (1件)
       const deleteLog = (id) => {
         if (confirm('このログを削除しますか？')) {
           db.collection('logs').doc(id).delete();
         }
       };
 
-      // 利用ログ全件削除
       const deleteAllLogs = () => {
         if (confirm('すべての利用ログを削除しますか？この操作は元に戻せません。')) {
           const batch = db.batch();
@@ -837,9 +877,9 @@
 
       return {
         currentScreen, isOnlyWrongMode, showAdminAuth, adminPassword, authError, adminTab,
-        newProblemTitle, selectedProblemId, selectedProblem, newForm, showHintModal, activeExplainTab, scrollContainer,
+        newProblemTitle, selectedProblemId, selectedProblem, newForm, showHintModal, activeExplainTab, scrollContainer, modalImageUrl,
         problems, logs, logTotals, activeProblem, currentSentIdx, isAnswerRevealed, targetSentences, currentSentence,
-        isMastered, getMasteredCount, getProgressPercent, getBadgeText, getBadgeClass, getParsedWords, onContainerScroll, scrollToSentence,
+        isMastered, getMasteredCount, getProgressPercent, getBadgeText, getBadgeClass, getParsedWords, onContainerScroll, scrollToSentence, openImageModal, closeImageModal,
         startStudy, confirmCancelStudy, confirmSaveStudy, applyScore,
         loginAdmin, addProblem, updateProblemTitle, deleteProblem, deleteLog, deleteAllLogs, handleImageUpload, addSentenceToProblem, deleteSentence, saveProblemSentences
       };
